@@ -10,11 +10,14 @@ export class SchedulerService {
    * Start the email scheduler
    * Runs every minute to check for emails that need to be sent
    */
-  static start(): void {
+  static async start(): Promise<void> {
     if (this.cronJob) {
       console.log('⚠️  Scheduler is already running');
       return;
     }
+
+    // Reset any stuck 'processing' recipients from previous crashes/restarts
+    await this.resetStuckRecipients();
 
     // Run every minute: '* * * * *'
     this.cronJob = cron.schedule('* * * * *', async () => {
@@ -40,6 +43,17 @@ export class SchedulerService {
    */
   private static async checkAndSendEmails(): Promise<void> {
     try {
+      // Reset any recipients stuck in 'processing' for more than 5 minutes
+      // This handles edge cases where status update might fail
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      await EmailRecipient.updateMany(
+        {
+          status: 'processing',
+          updatedAt: { $lt: fiveMinutesAgo }
+        },
+        { $set: { status: 'pending' } }
+      );
+
       const now = new Date();
 
       // Process max 50 emails per minute to avoid overwhelming the system
@@ -79,26 +93,39 @@ export class SchedulerService {
           console.log(`📧 Found emails to send...`);
         }
 
-        // Send the email
-        const result = await EmailService.sendEmail(recipient);
+        // Send the email with error handling for individual recipient
+        try {
+          const result = await EmailService.sendEmail(recipient);
 
-        if (result.success) {
-          // Mark as sent
-          await EmailRecipient.findByIdAndUpdate(
-            recipient._id,
-            {
-              status: 'sent',
-              sentAt: new Date()
-            },
-            { new: true }
-          );
-        } else {
-          // Mark as failed
+          if (result.success) {
+            // Mark as sent
+            await EmailRecipient.findByIdAndUpdate(
+              recipient._id,
+              {
+                status: 'sent',
+                sentAt: new Date()
+              },
+              { new: true }
+            );
+          } else {
+            // Mark as failed
+            await EmailRecipient.findByIdAndUpdate(
+              recipient._id,
+              {
+                status: 'failed',
+                error: result.error
+              },
+              { new: true }
+            );
+          }
+        } catch (error) {
+          // If anything goes wrong, mark as failed to prevent stuck 'processing' status
+          console.error(`❌ Error processing recipient ${recipient._id}:`, error);
           await EmailRecipient.findByIdAndUpdate(
             recipient._id,
             {
               status: 'failed',
-              error: result.error
+              error: error instanceof Error ? error.message : 'Unknown error during processing'
             },
             { new: true }
           );
@@ -171,5 +198,24 @@ export class SchedulerService {
   static async runManually(): Promise<void> {
     console.log('🔄 Running scheduler manually...');
     await this.checkAndSendEmails();
+  }
+
+  /**
+   * Reset recipients stuck in 'processing' status
+   * This can happen if the server crashes while sending emails
+   */
+  private static async resetStuckRecipients(): Promise<void> {
+    try {
+      const result = await EmailRecipient.updateMany(
+        { status: 'processing' },
+        { $set: { status: 'pending' } }
+      );
+
+      if (result.modifiedCount > 0) {
+        console.log(`🔄 Reset ${result.modifiedCount} stuck recipients from 'processing' to 'pending'`);
+      }
+    } catch (error) {
+      console.error('❌ Error resetting stuck recipients:', error);
+    }
   }
 }

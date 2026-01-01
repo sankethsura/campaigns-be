@@ -23,8 +23,10 @@ connectDB();
 // Initialize email service
 EmailService.initialize();
 
-// Start email scheduler
-SchedulerService.start();
+// Start email scheduler (async)
+(async () => {
+  await SchedulerService.start();
+})();
 
 app.use(cors({
   origin: true, // Allow all origins
