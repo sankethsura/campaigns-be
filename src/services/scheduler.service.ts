@@ -42,21 +42,16 @@ export class SchedulerService {
     try {
       const now = new Date();
 
-      // Get start of today (00:00:00)
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-
       // Process max 50 emails per minute to avoid overwhelming the system
       for (let i = 0; i < 50; i++) {
         // Use atomic findOneAndUpdate to claim a recipient
         // This prevents race conditions when multiple scheduler instances run
-        // Only send emails scheduled for TODAY (not past dates)
+        // Process ALL pending emails where the trigger time has passed (including past-due emails)
         const recipient = await EmailRecipient.findOneAndUpdate(
           {
             status: 'pending',
             triggerDate: {
-              $gte: startOfToday, // Must be today or later
-              $lte: now           // Time must have passed
+              $lte: now // Trigger time must have passed (includes past-due emails)
             }
           },
           {
