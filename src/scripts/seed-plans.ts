@@ -11,9 +11,9 @@ const plans = [
     description: 'Perfect for testing and small campaigns',
     price: 0,
     currency: 'INR',
-    emailLimit: 20,
+    emailLimit: 5,
     features: [
-      '20 emails per month',
+      '5 emails per month',
       'Basic campaign management',
       'Real-time tracking',
       'Email scheduling',

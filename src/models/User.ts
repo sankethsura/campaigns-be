@@ -11,6 +11,9 @@ export interface IUser extends Document {
   currentPlan: string;
   emailsSentThisMonth: number;
   planResetDate: Date;
+  subscriptionActive: boolean;
+  subscriptionStartDate?: Date;
+  lastPaymentId?: string;
   createdAt: Date;
   lastLogin: Date;
 }
@@ -62,6 +65,16 @@ const userSchema = new Schema<IUser>({
       date.setHours(0, 0, 0, 0);
       return date;
     }
+  },
+  subscriptionActive: {
+    type: Boolean,
+    default: false
+  },
+  subscriptionStartDate: {
+    type: Date
+  },
+  lastPaymentId: {
+    type: String
   },
   createdAt: {
     type: Date,

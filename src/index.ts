@@ -12,6 +12,8 @@ import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import campaignRoutes from './routes/campaign.routes';
 import pricingRoutes from './routes/pricing.routes';
+import paymentRoutes from './routes/payment.routes';
+import couponRoutes from './routes/coupon.routes';
 import { EmailService } from './services/email.service';
 import { SchedulerService } from './services/scheduler.service';
 
@@ -46,6 +48,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/pricing', pricingRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/coupon', couponRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);

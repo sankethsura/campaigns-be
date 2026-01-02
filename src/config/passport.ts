@@ -1,6 +1,7 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy, Profile, VerifyCallback } from 'passport-google-oauth20';
 import User from '../models/User';
+import Plan from '../models/Plan';
 
 const clientID = process.env.GOOGLE_CLIENT_ID;
 const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -41,6 +42,10 @@ if (!clientID || !clientSecret || clientID === 'your-google-client-id.apps.googl
           tokenExpiry.setHours(tokenExpiry.getHours() + 1);
 
           if (!user) {
+            // Calculate plan reset date (first day of next month)
+            const now = new Date();
+            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
             user = await User.create({
               googleId: profile.id,
               email: profile.emails?.[0].value,
@@ -49,10 +54,16 @@ if (!clientID || !clientSecret || clientID === 'your-google-client-id.apps.googl
               accessToken,
               refreshToken: refreshToken || undefined,
               accessTokenExpiry: tokenExpiry,
+              currentPlan: 'free',
+              emailsSentThisMonth: 0,
+              planResetDate: nextMonth,
+              subscriptionActive: true,
+              subscriptionStartDate: new Date(),
               createdAt: new Date(),
               lastLogin: new Date()
             });
             console.log('✅ New user created:', user.email);
+            console.log('✅ Free trial plan activated automatically');
             if (refreshToken) {
               console.log('✅ Refresh token stored');
             }

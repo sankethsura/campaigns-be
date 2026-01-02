@@ -7,6 +7,10 @@ export interface ISubscriptionRequest extends Document {
   userEmail: string;
   userName: string;
   status: 'pending' | 'contacted' | 'approved' | 'rejected';
+  paymentId?: string;
+  orderId?: string;
+  amount?: number;
+  approvedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,6 +42,18 @@ const subscriptionRequestSchema = new Schema<ISubscriptionRequest>({
     type: String,
     enum: ['pending', 'contacted', 'approved', 'rejected'],
     default: 'pending'
+  },
+  paymentId: {
+    type: String
+  },
+  orderId: {
+    type: String
+  },
+  amount: {
+    type: Number
+  },
+  approvedAt: {
+    type: Date
   }
 }, {
   timestamps: true
