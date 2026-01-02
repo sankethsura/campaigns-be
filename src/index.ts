@@ -11,6 +11,7 @@ import passportConfig from './config/passport';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import campaignRoutes from './routes/campaign.routes';
+import pricingRoutes from './routes/pricing.routes';
 import { EmailService } from './services/email.service';
 import { SchedulerService } from './services/scheduler.service';
 
@@ -44,6 +45,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/campaigns', campaignRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);

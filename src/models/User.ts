@@ -8,6 +8,9 @@ export interface IUser extends Document {
   refreshToken?: string;
   accessToken?: string;
   accessTokenExpiry?: Date;
+  currentPlan: string;
+  emailsSentThisMonth: number;
+  planResetDate: Date;
   createdAt: Date;
   lastLogin: Date;
 }
@@ -40,6 +43,25 @@ const userSchema = new Schema<IUser>({
   },
   accessTokenExpiry: {
     type: Date
+  },
+  currentPlan: {
+    type: String,
+    default: 'free',
+    enum: ['free', 'starter', 'pro']
+  },
+  emailsSentThisMonth: {
+    type: Number,
+    default: 0
+  },
+  planResetDate: {
+    type: Date,
+    default: () => {
+      const date = new Date();
+      date.setMonth(date.getMonth() + 1);
+      date.setDate(1);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
   },
   createdAt: {
     type: Date,

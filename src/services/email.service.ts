@@ -142,6 +142,37 @@ export class EmailService {
   }
 
   /**
+   * Send admin notification email
+   */
+  static async sendAdminNotification(options: {
+    to: string;
+    subject: string;
+    html: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      // For now, just log the notification
+      // In production, you would send an actual email to admin
+      console.log('📧 Admin Notification:');
+      console.log(`To: ${options.to}`);
+      console.log(`Subject: ${options.subject}`);
+      console.log('---');
+
+      // You can implement actual email sending here using nodemailer or another service
+      // For demo purposes, we'll just log it
+
+      return {
+        success: true
+      };
+    } catch (error) {
+      console.error('Failed to send admin notification:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
    * Test email configuration (no longer needed with OAuth)
    */
   static async testConnection(): Promise<boolean> {
