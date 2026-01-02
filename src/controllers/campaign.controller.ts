@@ -80,6 +80,54 @@ export const uploadExcel = async (req: AuthRequest, res: Response): Promise<void
     // Delete uploaded file after parsing
     fs.unlinkSync(req.file.path);
 
+    // Check plan limits before importing
+    const User = (await import('../models/User')).default;
+    const Plan = (await import('../models/Plan')).default;
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const plan = await Plan.findOne({ name: user.currentPlan });
+    if (!plan) {
+      res.status(404).json({ error: 'Plan not found' });
+      return;
+    }
+
+    // Check if plan has email limit (-1 means unlimited for pro plan)
+    if (plan.emailLimit !== -1) {
+      // Count all recipients created by user this month (across all campaigns)
+      const userCampaigns = await Campaign.find({ userId: req.userId, isDeleted: false });
+      const campaignIds = userCampaigns.map(c => c._id);
+
+      // Get start of current billing period
+      const currentPeriodStart = user.planResetDate
+        ? new Date(user.planResetDate.getFullYear(), user.planResetDate.getMonth() - 1, 1)
+        : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+      const recipientsThisMonth = await EmailRecipient.countDocuments({
+        campaignId: { $in: campaignIds },
+        isDeleted: false,
+        createdAt: { $gte: currentPeriodStart }
+      });
+
+      const newRecipientsCount = parsed.data.length;
+      const totalAfterImport = recipientsThisMonth + newRecipientsCount;
+
+      if (totalAfterImport > plan.emailLimit) {
+        res.status(403).json({
+          error: `Plan limit would be exceeded. Your ${plan.displayName} plan allows ${plan.emailLimit} emails per month. You have ${recipientsThisMonth} scheduled. Importing ${newRecipientsCount} more would exceed your limit by ${totalAfterImport - plan.emailLimit}. Please upgrade your plan.`,
+          planLimit: plan.emailLimit,
+          currentCount: recipientsThisMonth,
+          attemptedImport: newRecipientsCount,
+          remaining: plan.emailLimit - recipientsThisMonth
+        });
+        return;
+      }
+    }
+
     // Save valid recipients to database
     const recipients = parsed.data.map(row => ({
       campaignId: campaign._id,
@@ -275,6 +323,50 @@ export const addRecipient = async (req: AuthRequest, res: Response): Promise<voi
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
+    }
+
+    // Check plan limits
+    const User = (await import('../models/User')).default;
+    const Plan = (await import('../models/Plan')).default;
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Get plan details
+    const plan = await Plan.findOne({ name: user.currentPlan });
+    if (!plan) {
+      res.status(404).json({ error: 'Plan not found' });
+      return;
+    }
+
+    // Check if plan has email limit (-1 means unlimited for pro plan)
+    if (plan.emailLimit !== -1) {
+      // Count all recipients created by user this month (across all campaigns)
+      const userCampaigns = await Campaign.find({ userId: req.userId, isDeleted: false });
+      const campaignIds = userCampaigns.map(c => c._id);
+
+      // Get start of current billing period
+      const currentPeriodStart = user.planResetDate
+        ? new Date(user.planResetDate.getFullYear(), user.planResetDate.getMonth() - 1, 1)
+        : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+      const recipientsThisMonth = await EmailRecipient.countDocuments({
+        campaignId: { $in: campaignIds },
+        isDeleted: false,
+        createdAt: { $gte: currentPeriodStart }
+      });
+
+      if (recipientsThisMonth >= plan.emailLimit) {
+        res.status(403).json({
+          error: `Plan limit reached. Your ${plan.displayName} plan allows ${plan.emailLimit} emails per month. You have ${recipientsThisMonth} scheduled. Please upgrade your plan to add more recipients.`,
+          planLimit: plan.emailLimit,
+          currentCount: recipientsThisMonth
+        });
+        return;
+      }
     }
 
     const recipient = await EmailRecipient.create({
