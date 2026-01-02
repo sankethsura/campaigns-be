@@ -12,16 +12,19 @@ import fs from 'fs';
 export async function recalculateCampaignCounts(campaignId: string): Promise<void> {
   const sentCount = await EmailRecipient.countDocuments({
     campaignId,
-    status: 'sent'
+    status: 'sent',
+    isDeleted: false
   });
 
   const failedCount = await EmailRecipient.countDocuments({
     campaignId,
-    status: 'failed'
+    status: 'failed',
+    isDeleted: false
   });
 
   const totalRecipients = await EmailRecipient.countDocuments({
-    campaignId
+    campaignId,
+    isDeleted: false
   });
 
   await Campaign.findByIdAndUpdate(campaignId, {
@@ -65,7 +68,7 @@ export const uploadExcel = async (req: AuthRequest, res: Response): Promise<void
     }
 
     // Verify campaign belongs to user
-    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId, isDeleted: false });
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
@@ -122,7 +125,7 @@ export const uploadExcel = async (req: AuthRequest, res: Response): Promise<void
 
 export const getCampaigns = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const campaigns = await Campaign.find({ userId: req.userId }).sort({ createdAt: -1 });
+    const campaigns = await Campaign.find({ userId: req.userId, isDeleted: false }).sort({ createdAt: -1 });
     res.json(campaigns);
   } catch (error) {
     console.error('Error fetching campaigns:', error);
@@ -133,7 +136,7 @@ export const getCampaigns = async (req: AuthRequest, res: Response): Promise<voi
 export const getCampaignById = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const campaign = await Campaign.findOne({ _id: id, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: id, userId: req.userId, isDeleted: false });
 
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
@@ -154,7 +157,7 @@ export const getCampaignRecipients = async (req: AuthRequest, res: Response): Pr
     const limit = parseInt(req.query.limit as string) || 10;
 
     // Verify campaign belongs to user
-    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId, isDeleted: false });
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
@@ -164,10 +167,10 @@ export const getCampaignRecipients = async (req: AuthRequest, res: Response): Pr
     const skip = (page - 1) * limit;
 
     // Get total count for pagination metadata
-    const totalRecipients = await EmailRecipient.countDocuments({ campaignId });
+    const totalRecipients = await EmailRecipient.countDocuments({ campaignId, isDeleted: false });
 
     // Get paginated recipients (sorted newest first, older emails below)
-    const recipients = await EmailRecipient.find({ campaignId })
+    const recipients = await EmailRecipient.find({ campaignId, isDeleted: false })
       .sort({ triggerDate: -1 })
       .skip(skip)
       .limit(limit);
@@ -198,13 +201,13 @@ export const updateRecipient = async (req: AuthRequest, res: Response): Promise<
     const { email, message, triggerDate } = req.body;
 
     // Verify campaign belongs to user
-    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId, isDeleted: false });
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
     }
 
-    const recipient = await EmailRecipient.findOne({ _id: recipientId, campaignId });
+    const recipient = await EmailRecipient.findOne({ _id: recipientId, campaignId, isDeleted: false });
     if (!recipient) {
       res.status(404).json({ error: 'Recipient not found' });
       return;
@@ -229,19 +232,22 @@ export const deleteRecipient = async (req: AuthRequest, res: Response): Promise<
     const { campaignId, recipientId } = req.params;
 
     // Verify campaign belongs to user
-    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId, isDeleted: false });
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
     }
 
-    const recipient = await EmailRecipient.findOne({ _id: recipientId, campaignId });
+    const recipient = await EmailRecipient.findOne({ _id: recipientId, campaignId, isDeleted: false });
     if (!recipient) {
       res.status(404).json({ error: 'Recipient not found' });
       return;
     }
 
-    await EmailRecipient.findByIdAndDelete(recipientId);
+    // Soft delete recipient
+    recipient.isDeleted = true;
+    recipient.deletedAt = new Date();
+    await recipient.save();
 
     // Recalculate campaign counts
     await recalculateCampaignCounts(campaignId);
@@ -265,7 +271,7 @@ export const addRecipient = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     // Verify campaign belongs to user
-    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId, isDeleted: false });
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
@@ -294,17 +300,22 @@ export const deleteCampaign = async (req: AuthRequest, res: Response): Promise<v
   try {
     const { id } = req.params;
 
-    const campaign = await Campaign.findOne({ _id: id, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: id, userId: req.userId, isDeleted: false });
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
     }
 
-    // Delete all recipients
-    await EmailRecipient.deleteMany({ campaignId: id });
+    // Soft delete all recipients
+    await EmailRecipient.updateMany(
+      { campaignId: id, isDeleted: false },
+      { isDeleted: true, deletedAt: new Date() }
+    );
 
-    // Delete campaign
-    await Campaign.findByIdAndDelete(id);
+    // Soft delete campaign
+    campaign.isDeleted = true;
+    campaign.deletedAt = new Date();
+    await campaign.save();
 
     res.json({ message: 'Campaign deleted successfully' });
 
@@ -319,13 +330,13 @@ export const triggerEmailNow = async (req: AuthRequest, res: Response): Promise<
     const { campaignId, recipientId } = req.params;
 
     // Verify campaign belongs to user
-    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId });
+    const campaign = await Campaign.findOne({ _id: campaignId, userId: req.userId, isDeleted: false });
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
     }
 
-    const recipient = await EmailRecipient.findOne({ _id: recipientId, campaignId });
+    const recipient = await EmailRecipient.findOne({ _id: recipientId, campaignId, isDeleted: false });
     if (!recipient) {
       res.status(404).json({ error: 'Recipient not found' });
       return;

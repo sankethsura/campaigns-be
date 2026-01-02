@@ -8,6 +8,8 @@ export interface IEmailRecipient extends Document {
   status: 'pending' | 'sent' | 'failed' | 'scheduled' | 'processing';
   sentAt?: Date;
   error?: string;
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +46,14 @@ const emailRecipientSchema = new Schema<IEmailRecipient>({
   },
   error: {
     type: String
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  deletedAt: {
+    type: Date
   }
 }, {
   timestamps: true

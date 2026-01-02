@@ -45,11 +45,12 @@ export class SchedulerService {
     try {
       // Reset any recipients stuck in 'processing' for more than 1 minutes
       // This handles edge cases where status update might fail
-      const fiveMinutesAgo = new Date(Date.now() - 1 * 60 * 1000);
+      const oneMinuteAgo = new Date(Date.now() - 1 * 60 * 1000);
       await EmailRecipient.updateMany(
         {
           status: 'processing',
-          updatedAt: { $lt: fiveMinutesAgo }
+          updatedAt: { $lt: oneMinuteAgo },
+          isDeleted: false
         },
         { $set: { status: 'pending' } }
       );
@@ -66,7 +67,8 @@ export class SchedulerService {
             status: 'pending',
             triggerDate: {
               $lte: now // Trigger time must have passed (includes past-due emails)
-            }
+            },
+            isDeleted: false
           },
           {
             $set: { status: 'processing' }
@@ -148,23 +150,27 @@ export class SchedulerService {
     try {
       // Find campaigns that are scheduled or in_progress
       const campaigns = await Campaign.find({
-        status: { $in: ['scheduled', 'in_progress', 'draft'] }
+        status: { $in: ['scheduled', 'in_progress', 'draft'] },
+        isDeleted: false
       });
 
       for (const campaign of campaigns) {
         // Recalculate counts from actual recipients to ensure accuracy
         const sentCount = await EmailRecipient.countDocuments({
           campaignId: campaign._id,
-          status: 'sent'
+          status: 'sent',
+          isDeleted: false
         });
 
         const failedCount = await EmailRecipient.countDocuments({
           campaignId: campaign._id,
-          status: 'failed'
+          status: 'failed',
+          isDeleted: false
         });
 
         const totalRecipients = await EmailRecipient.countDocuments({
-          campaignId: campaign._id
+          campaignId: campaign._id,
+          isDeleted: false
         });
 
         // Update counts in campaign
@@ -207,7 +213,7 @@ export class SchedulerService {
   private static async resetStuckRecipients(): Promise<void> {
     try {
       const result = await EmailRecipient.updateMany(
-        { status: 'processing' },
+        { status: 'processing', isDeleted: false },
         { $set: { status: 'pending' } }
       );
 

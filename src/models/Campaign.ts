@@ -8,6 +8,8 @@ export interface ICampaign extends Document {
   totalRecipients: number;
   sentCount: number;
   failedCount: number;
+  isDeleted: boolean;
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +44,14 @@ const campaignSchema = new Schema<ICampaign>({
   failedCount: {
     type: Number,
     default: 0
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  deletedAt: {
+    type: Date
   }
 }, {
   timestamps: true
