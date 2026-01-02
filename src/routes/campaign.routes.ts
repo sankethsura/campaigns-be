@@ -12,7 +12,8 @@ import {
   deleteRecipient,
   addRecipient,
   deleteCampaign,
-  triggerEmailNow
+  triggerEmailNow,
+  recalculateCounts
 } from '../controllers/campaign.controller';
 
 const router = Router();
@@ -53,6 +54,7 @@ router.post('/', createCampaign);
 router.get('/', getCampaigns);
 router.get('/:id', getCampaignById);
 router.delete('/:id', deleteCampaign);
+router.post('/:id/recalculate', recalculateCounts);
 
 // Excel upload
 router.post('/:id/upload', upload.single('file'), uploadExcel);

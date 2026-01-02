@@ -7,8 +7,9 @@ import fs from 'fs';
 
 /**
  * Recalculate campaign counts from actual recipient statuses
+ * This ensures counts always match the actual EmailRecipient collection
  */
-async function recalculateCampaignCounts(campaignId: string): Promise<void> {
+export async function recalculateCampaignCounts(campaignId: string): Promise<void> {
   const sentCount = await EmailRecipient.countDocuments({
     campaignId,
     status: 'sent'
@@ -28,6 +29,8 @@ async function recalculateCampaignCounts(campaignId: string): Promise<void> {
     failedCount,
     totalRecipients
   });
+
+  console.log(`📊 Recalculated counts for campaign ${campaignId}: ${sentCount} sent, ${failedCount} failed, ${totalRecipients} total`);
 }
 
 export const createCampaign = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -373,5 +376,37 @@ export const triggerEmailNow = async (req: AuthRequest, res: Response): Promise<
   } catch (error) {
     console.error('Error triggering email:', error);
     res.status(500).json({ error: 'Failed to trigger email' });
+  }
+};
+
+/**
+ * Manually recalculate campaign counts from EmailRecipient collection
+ * Useful for fixing count mismatches
+ */
+export const recalculateCounts = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    // Verify campaign belongs to user
+    const campaign = await Campaign.findOne({ _id: id, userId: req.userId });
+    if (!campaign) {
+      res.status(404).json({ error: 'Campaign not found' });
+      return;
+    }
+
+    // Recalculate counts by querying EmailRecipient collection
+    await recalculateCampaignCounts(id);
+
+    // Fetch updated campaign
+    const updatedCampaign = await Campaign.findById(id);
+
+    res.json({
+      message: 'Campaign counts recalculated successfully',
+      campaign: updatedCampaign
+    });
+
+  } catch (error) {
+    console.error('Error recalculating counts:', error);
+    res.status(500).json({ error: 'Failed to recalculate counts' });
   }
 };
