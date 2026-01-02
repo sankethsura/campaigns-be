@@ -43,9 +43,9 @@ export class SchedulerService {
    */
   private static async checkAndSendEmails(): Promise<void> {
     try {
-      // Reset any recipients stuck in 'processing' for more than 5 minutes
+      // Reset any recipients stuck in 'processing' for more than 1 minutes
       // This handles edge cases where status update might fail
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const fiveMinutesAgo = new Date(Date.now() - 1 * 60 * 1000);
       await EmailRecipient.updateMany(
         {
           status: 'processing',
